@@ -1,5 +1,6 @@
-// 2024-11-10 by Joshua Hoffmann
+// 2024-11-12 by Joshua Hoffmann
 
+require('dotenv').config(); 
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -12,16 +13,16 @@ let meshData = {
 };
 let currentNodeIndex = 1;
 
-const apiUrl = 'https://example.com/updatelog.php';
+const apiUrl = process.env.WEBSERVER_URL;
 const logFile = path.join(__dirname, 'meshdata.json');
 const delay = 5000;
 const retryDelay = 10000;
-const apiKey = 'api-key';
+const apiKey = process.env.WEBSERVER_APIKEY;
 const piMeshLoc = '/home/jho/.local/bin/meshtastic ';
-const showStdout = true;
-const networkNode = '--host 192.168.178.114 ';
-const isRaspberryPi = false;
-const useNetworkNode = true;
+const showStdout = process.env.SHOW_CONSOLE_OUTPUT === "true" ? true : false;
+const networkNode = '--host' + process.env.NETWORK_NODE_IP + ' ';
+const isRaspberryPi = process.env.IS_RASPBERRYPI === 'true' ? true : false;
+const useNetworkNode = process.env.USE_NETWORK_NODE === "true" ? true : false;
 
 const structureHandling = () => {
   if (fs.existsSync(logFile)) {
@@ -82,6 +83,7 @@ const runInfo = () => {
               batteryLevel: nodeData.deviceMetrics?.batteryLevel || null,
               voltage: nodeData.deviceMetrics?.voltage || null,
               snr: nodeData.snr || null,
+              hops: nodeData.hopsAway || 0,
               uptimeSeconds: nodeData.deviceMetrics?.uptimeSeconds || null,
               lat: nodeData.position?.latitude || null,
               lon: nodeData.position?.longitude || null,
