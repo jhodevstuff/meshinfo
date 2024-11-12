@@ -14,11 +14,14 @@ let currentNodeIndex = 1;
 
 const apiUrl = 'https://example.com/updatelog.php';
 const logFile = path.join(__dirname, 'meshdata.json');
-const delay = 1000;
+const delay = 5000;
+const retryDelay = 10000;
 const apiKey = 'api-key';
-const showStdout = false;
+const piMeshLoc = '/home/jho/.local/bin/meshtastic ';
+const showStdout = true;
 const networkNode = '--host 192.168.178.114 ';
-const useNetworkNode = false;
+const isRaspberryPi = false;
+const useNetworkNode = true;
 
 const structureHandling = () => {
   if (fs.existsSync(logFile)) {
@@ -32,12 +35,6 @@ const structureHandling = () => {
         traceroutes: [],
       };
     }
-  } else {
-    meshData = {
-      info: { lastUpdated: null, infoFrom: null },
-      knownNodes: [],
-      traceroutes: [],
-    };
   }
 };
 
@@ -48,12 +45,16 @@ const saveData = () => {
 };
 
 const runInfo = () => {
-  console.log('Loading Nodes infos')
+  console.log('Loading Nodes infos');
   exec(
-    'meshtastic ' + (useNetworkNode ? networkNode : '') + '--info',
+    isRaspberryPi
+      ? piMeshLoc
+      : 'meshtastic ' + (useNetworkNode ? networkNode : '') + '--info',
     (error, stdout) => {
       if (error) {
         console.error(`Info Error: ${error.message}`);
+        console.log(`Retrying in ${retryDelay / 1000} seconds...`);
+        setTimeout(runInfo, retryDelay);
         return;
       }
       if (showStdout) console.log('Info Result:', stdout);
@@ -64,28 +65,38 @@ const runInfo = () => {
         let nodesBlock = nodesMatch[1].trim();
         try {
           const origNodes = JSON.parse(nodesBlock);
-          meshData.knownNodes = Object.keys(origNodes).map((nodeId) => ({
-            id: nodeId,
-            longName: origNodes[nodeId].user.longName || null,
-            shortName: origNodes[nodeId].user.shortName || null,
-            model: origNodes[nodeId].user.hwModel || null,
-            lastHeard: origNodes[nodeId].lastHeard || null,
-            batteryLevel: origNodes[nodeId].deviceMetrics?.batteryLevel || null,
-            uptimeSeconds:
-              origNodes[nodeId].deviceMetrics?.uptimeSeconds || null,
-            publicKey: origNodes[nodeId].user.publicKey || null,
-          }));
+          meshData.knownNodes = Object.keys(origNodes).map((nodeId) => {
+            const nodeData = origNodes[nodeId];
+            const knownNode = meshData.knownNodes.find((n) => n.id === nodeId);
+            const lastHeard = nodeData.lastHeard || null;
+            if (knownNode && knownNode.lastHeard !== lastHeard) {
+              knownNode.lastHeard = lastHeard;
+              knownNode.lastTracerouteAttempt = null;
+            }
+            return {
+              id: nodeId,
+              longName: nodeData.user.longName || null,
+              shortName: nodeData.user.shortName || null,
+              model: nodeData.user.hwModel || null,
+              lastHeard: lastHeard,
+              batteryLevel: nodeData.deviceMetrics?.batteryLevel || null,
+              voltage: nodeData.deviceMetrics?.voltage || null,
+              snr: nodeData.snr || null,
+              uptimeSeconds: nodeData.deviceMetrics?.uptimeSeconds || null,
+              lat: nodeData.position?.latitude || null,
+              lon: nodeData.position?.longitude || null,
+              publicKey: nodeData.user.publicKey || null,
+              lastTracerouteSuccess: knownNode?.lastTracerouteSuccess || null,
+              lastTracerouteAttempt: knownNode?.lastTracerouteAttempt || null,
+            };
+          });
+          meshData.info.lastUpdated = Date.now();
           meshData.info.infoFrom = meshData.knownNodes[0].id;
-          console.log(
-            'Using connected Node',
-            meshData.info.infoFrom,
-            'for this'
-          );
           saveData();
           currentNodeIndex = 1;
           runTraceroute();
         } catch (parseError) {
-          console.error('Error parsing Nodes info block', parseError.message);
+          setTimeout(runInfo, retryDelay);
         }
       }
     }
@@ -97,24 +108,37 @@ const runTraceroute = () => {
     setTimeout(runInfo, delay);
     return;
   }
-  const nodeId = meshData.knownNodes[currentNodeIndex].id;
-  console.log(`Running traceroute to Node ${nodeId}`);
+  const node = meshData.knownNodes[currentNodeIndex];
+  const currentTime = Date.now();
+  if (
+    (node.lastTracerouteSuccess &&
+      currentTime - node.lastTracerouteSuccess < 1800000) || // 0.5h
+    (node.lastTracerouteAttempt &&
+      currentTime - node.lastTracerouteAttempt < 3600000) // 1h
+  ) {
+    currentNodeIndex++;
+    setTimeout(runTraceroute, delay);
+    return;
+  }
+  console.log(`Traceroute to Node ${node.id}`);
   exec(
-    "meshtastic " +
-      (useNetworkNode ? networkNode : "") +
+    isRaspberryPi ? piMeshLoc : 'meshtastic ' +
+      (useNetworkNode ? networkNode : '') +
       "--traceroute '" +
-      nodeId +
+      node.id +
       "'",
     (error, stdout) => {
+      node.lastTracerouteAttempt = currentTime;
       if (error || stdout.includes('Timed out')) {
         currentNodeIndex++;
-        setTimeout(runTraceroute, delay);
+        setTimeout(runTraceroute, retryDelay);
         return;
       }
       if (showStdout) console.log('Traceroute Result:', stdout);
-      const parsedTrace = parseTraceroute(stdout, nodeId);
+      const parsedTrace = parseTraceroute(stdout, node.id);
       if (parsedTrace) {
         addTraceToNode(parsedTrace);
+        node.lastTracerouteSuccess = currentTime;
         meshData.info.lastUpdated = Date.now();
         saveData();
       }
@@ -133,12 +157,6 @@ const addTraceToNode = (parsedTrace) => {
   } else {
     nodeTraceroute = { nodeId: parsedTrace.nodeId, traces: [parsedTrace] };
     meshData.traceroutes.push(nodeTraceroute);
-  }
-  const node = meshData.knownNodes.find(
-    (node) => node.id === parsedTrace.nodeId
-  );
-  if (node && (!node.lastHeard || parsedTrace.timeStamp > node.lastHeard)) {
-    node.lastHeard = parsedTrace.timeStamp;
   }
 };
 

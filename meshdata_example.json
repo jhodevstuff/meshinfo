@@ -11,8 +11,14 @@
       "model": "HELTEC_V3",
       "lastHeard": 1731270846,
       "batteryLevel": 101,
-      "uptimeSeconds": 81257,
-      "publicKey": "*****************************************"
+      "voltage": 4.24,
+      "snr": 4.25,
+      "uptimeSeconds": 468574,
+      "lat": 47.8,
+      "lon": 11.2,
+      "publicKey": "*****************************************",
+      "lastTracerouteSuccess": null,
+      "lastTracerouteAttempt": null
     },
     {
       "id": "!****9edc",
@@ -21,8 +27,14 @@
       "model": "HELTEC_V3",
       "lastHeard": 1731270864284,
       "batteryLevel": 98,
-      "uptimeSeconds": 46,
-      "publicKey": "*****************************************"
+      "voltage": 4.24,
+      "snr": 4.25,
+      "uptimeSeconds": 468574,
+      "lat": 47.8,
+      "lon": 11.2,
+      "publicKey": "*****************************************",
+      "lastTracerouteSuccess": null,
+      "lastTracerouteAttempt": null
     },
     {
       "id": "!****2208",
@@ -31,8 +43,14 @@
       "model": "TBEAM",
       "lastHeard": 1731261017,
       "batteryLevel": 95,
+      "voltage": 4.24,
+      "snr": 4.25,
       "uptimeSeconds": 468574,
-      "publicKey": "*****************************************"
+      "lat": 47.800000,
+      "lon": 11.200000,
+      "publicKey": "*****************************************",
+      "lastTracerouteSuccess": null,
+      "lastTracerouteAttempt": null
     },
     {
       "id": "!****a20b",
@@ -41,8 +59,14 @@
       "model": "T_ECHO",
       "lastHeard": 1730979151,
       "batteryLevel": 94,
-      "uptimeSeconds": 5994,
-      "publicKey": "*****************************************"
+      "voltage": 4.24,
+      "snr": 4.25,
+      "uptimeSeconds": 468574,
+      "lat": 47.8,
+      "lon": 11.2,
+      "publicKey": "*****************************************",
+      "lastTracerouteSuccess": null,
+      "lastTracerouteAttempt": null
     },
     {
       "id": "!****e328",
@@ -51,8 +75,14 @@
       "model": "TBEAM",
       "lastHeard": 1731261657,
       "batteryLevel": 101,
-      "uptimeSeconds": 188772,
-      "publicKey": "*****************************************"
+      "voltage": 4.24,
+      "snr": 4.25,
+      "uptimeSeconds": 468574,
+      "lat": 47.8,
+      "lon": 11.2,
+      "publicKey": "*****************************************",
+      "lastTracerouteSuccess": null,
+      "lastTracerouteAttempt": null
     }
   ],
   "traceroutes": [
