@@ -1,10 +1,10 @@
 // 2024-11-12 by Joshua Hoffmann
 
-require('dotenv').config(); 
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
+require("dotenv").config();
+const { exec } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
 
 let meshData = {
   info: { lastUpdated: null, infoFrom: null },
@@ -14,19 +14,19 @@ let meshData = {
 let currentNodeIndex = 1;
 
 const apiUrl = process.env.WEBSERVER_URL;
-const logFile = path.join(__dirname, 'meshdata.json');
+const logFile = path.join(__dirname, "meshdata.json");
 const delay = 5000;
 const retryDelay = 10000;
 const apiKey = process.env.WEBSERVER_APIKEY;
-const piMeshLoc = '/home/jho/.local/bin/meshtastic ';
+const piMeshLoc = "/home/jho/.local/bin/meshtastic ";
 const showStdout = process.env.SHOW_CONSOLE_OUTPUT === "true" ? true : false;
-const networkNode = '--host' + process.env.NETWORK_NODE_IP + ' ';
-const isRaspberryPi = process.env.IS_RASPBERRYPI === 'true' ? true : false;
+const networkNode = "--host " + process.env.NETWORK_NODE_IP + " ";
+const isRaspberryPi = process.env.IS_RASPBERRYPI === "true" ? true : false;
 const useNetworkNode = process.env.USE_NETWORK_NODE === "true" ? true : false;
 
 const structureHandling = () => {
   if (fs.existsSync(logFile)) {
-    const fileContent = fs.readFileSync(logFile, 'utf8');
+    const fileContent = fs.readFileSync(logFile, "utf8");
     try {
       meshData = JSON.parse(fileContent);
     } catch (error) {
@@ -42,15 +42,15 @@ const structureHandling = () => {
 const saveData = () => {
   fs.writeFileSync(logFile, JSON.stringify(meshData, null, 2));
   serverSync();
-  console.log('Data updated');
+  console.log("Data updated");
 };
 
 const runInfo = () => {
-  console.log('Loading Nodes infos');
+  console.log("Loading Nodes infos");
   exec(
-    isRaspberryPi
-      ? piMeshLoc
-      : 'meshtastic ' + (useNetworkNode ? networkNode : '') + '--info',
+    (isRaspberryPi ? piMeshLoc : "meshtastic ") +
+      (useNetworkNode ? networkNode : "") +
+      "--info",
     (error, stdout) => {
       if (error) {
         console.error(`Info Error: ${error.message}`);
@@ -58,7 +58,7 @@ const runInfo = () => {
         setTimeout(runInfo, retryDelay);
         return;
       }
-      if (showStdout) console.log('Info Result:', stdout);
+      if (showStdout) console.log("Info Result:", stdout);
       const nodesMatch = stdout.match(
         /Nodes in mesh:\s*({[\s\S]*?})\s*(?:Preferences:|Channels:|$)/
       );
@@ -124,19 +124,19 @@ const runTraceroute = () => {
   }
   console.log(`Traceroute to Node ${node.id}`);
   exec(
-    isRaspberryPi ? piMeshLoc : 'meshtastic ' +
-      (useNetworkNode ? networkNode : '') +
+    (isRaspberryPi ? piMeshLoc : "meshtastic ") +
+      (useNetworkNode ? networkNode : "") +
       "--traceroute '" +
       node.id +
       "'",
     (error, stdout) => {
       node.lastTracerouteAttempt = currentTime;
-      if (error || stdout.includes('Timed out')) {
+      if (error || stdout.includes("Timed out")) {
         currentNodeIndex++;
         setTimeout(runTraceroute, retryDelay);
         return;
       }
-      if (showStdout) console.log('Traceroute Result:', stdout);
+      if (showStdout) console.log("Traceroute Result:", stdout);
       const parsedTrace = parseTraceroute(stdout, node.id);
       if (parsedTrace) {
         addTraceToNode(parsedTrace);
@@ -170,21 +170,21 @@ const parseTraceroute = (traceText, nodeId) => {
     nodeTraceFrom: [],
     hops: -1,
   };
-  const lines = traceText.split('\n');
+  const lines = traceText.split("\n");
   let toLine = null;
   let fromLine = null;
   lines.forEach((line) => {
-    if (line.includes('Route traced towards destination:')) {
+    if (line.includes("Route traced towards destination:")) {
       toLine = true;
-    } else if (line.includes('Route traced back to us:')) {
+    } else if (line.includes("Route traced back to us:")) {
       fromLine = true;
-    } else if (toLine && line.includes(' --> ')) {
-      trace.nodeTraceTo = line.split(' --> ').map((item) => item.split(' ')[0]);
+    } else if (toLine && line.includes(" --> ")) {
+      trace.nodeTraceTo = line.split(" --> ").map((item) => item.split(" ")[0]);
       toLine = false;
-    } else if (fromLine && line.includes(' --> ')) {
+    } else if (fromLine && line.includes(" --> ")) {
       trace.nodeTraceFrom = line
-        .split(' --> ')
-        .map((item) => item.split(' ')[0]);
+        .split(" --> ")
+        .map((item) => item.split(" ")[0]);
       fromLine = false;
     }
   });
@@ -194,21 +194,21 @@ const parseTraceroute = (traceText, nodeId) => {
     trace.hops = Math.min(toHops, fromHops);
     return trace;
   }
-  console.error('Traceroute not complete - ignoring.');
+  console.error("Traceroute not complete - ignoring.");
   return null;
 };
 
 const serverSync = async () => {
   try {
-    const jsonData = fs.readFileSync(logFile, 'utf8');
+    const jsonData = fs.readFileSync(logFile, "utf8");
     const parsedData = JSON.parse(jsonData);
     parsedData.apiKey = apiKey;
     await axios.post(apiUrl, parsedData, {
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
-    console.log('Updated data on server');
+    console.log("Updated data on server");
   } catch (error) {
     console.error(`API Error: ${error.message}`);
   }
