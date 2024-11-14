@@ -1,0 +1,18 @@
+{
+  "apiUrl": "https://example.com/mt/updatelog.php",
+  "apiKey": "api-key",
+  "networkNodeIp": "192.168.178.114",
+  "verbose": true,
+  "showConsoleOutput": true,
+  "isRaspberryPi": false,
+  "absoluteMeshtasticPathRaspberry": "/home/jho/.local/bin/meshtastic",
+  "useNetworkNode": false,
+  "uploadToServer": true,
+  "delays": {
+    "retryDelay": 30,
+    "delay": 5,
+    "tracerouteActiveNodes": 900,
+    "tracerouteInactiveNodes": 2700,
+    "cleanOldTraceroutes": 172800
+  }
+}

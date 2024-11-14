@@ -3,4 +3,5 @@ package-lock.json
 .DS_Store
 
 meshdata.json
-.env
+nodesindex.json
+config.json

@@ -1,10 +1,11 @@
-// 2024-11-12 by Joshua Hoffmann
+// 2024-11-14 by Joshua Hoffmann
 
-require("dotenv").config();
-const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { exec } = require("child_process");
 const axios = require("axios");
+
+const config = require("./config.json");
 
 let meshData = {
   info: { lastUpdated: null, infoFrom: null },
@@ -13,16 +14,29 @@ let meshData = {
 };
 let currentNodeIndex = 1;
 
-const apiUrl = process.env.WEBSERVER_URL;
 const logFile = path.join(__dirname, "meshdata.json");
-const delay = 5000;
-const retryDelay = 10000;
-const apiKey = process.env.WEBSERVER_APIKEY;
-const piMeshLoc = "/home/jho/.local/bin/meshtastic ";
-const showStdout = process.env.SHOW_CONSOLE_OUTPUT === "true" ? true : false;
-const networkNode = "--host " + process.env.NETWORK_NODE_IP + " ";
-const isRaspberryPi = process.env.IS_RASPBERRYPI === "true" ? true : false;
-const useNetworkNode = process.env.USE_NETWORK_NODE === "true" ? true : false;
+
+const printVerbose = (message) => {
+  if (config.verbose) {
+    const timestamp = new Date(new Date().getTime() + 3600000)
+      .toISOString()
+      .replace(/T/, "_")
+      .replace(/\..+/, "")
+      .replace(/-/g, "-")
+      .replace(/:/g, ":");
+    console.log(`[${timestamp}] ${message}`);
+  }
+};
+
+const printError = (message) => {
+  const timestamp = new Date(new Date().getTime() + 3600000)
+    .toISOString()
+    .replace(/T/, "_")
+    .replace(/\..+/, "")
+    .replace(/-/g, "-")
+    .replace(/:/g, ":");
+  console.error(`[${timestamp}] ${message}`);
+};
 
 const structureHandling = () => {
   if (fs.existsSync(logFile)) {
@@ -40,103 +54,141 @@ const structureHandling = () => {
 };
 
 const saveData = () => {
+  cleanOldTraceroutes();
   fs.writeFileSync(logFile, JSON.stringify(meshData, null, 2));
-  serverSync();
-  console.log("Data updated");
+  if (config.uploadToServer) {
+    serverSync();
+  }
+  printVerbose("Data updated");
 };
 
-const runInfo = () => {
-  console.log("Loading Nodes infos");
+const cleanOldTraceroutes = () => {
+  const cutoffTime = Date.now() - config.delays.cleanOldTraceroutes * 1000;
+  meshData.traceroutes = meshData.traceroutes.filter((route) => {
+    route.traces = route.traces.filter((trace) => trace.timeStamp > cutoffTime);
+    return route.traces.length > 0;
+  });
+};
+
+const runInfo = (retryAfterFailure = true) => {
+  printVerbose("Loading Nodes infos");
   exec(
-    (isRaspberryPi ? piMeshLoc : "meshtastic ") +
-      (useNetworkNode ? networkNode : "") +
+    (config.isRaspberryPi
+      ? config.absoluteMeshtasticPathRaspberry + " "
+      : "meshtastic ") +
+      (config.useNetworkNode ? `--host ${config.networkNodeIp} ` : "") +
       "--info",
     (error, stdout) => {
       if (error) {
-        console.error(`Info Error: ${error.message}`);
-        console.log(`Retrying in ${retryDelay / 1000} seconds...`);
-        setTimeout(runInfo, retryDelay);
+        printError(`Info Error: ${error.message}`);
+        if (retryAfterFailure) {
+          printVerbose(`Retrying in ${config.delays.retryDelay} seconds...`);
+          setTimeout(
+            () => runInfo(retryAfterFailure),
+            config.delays.retryDelay * 1000
+          );
+        }
         return;
       }
-      if (showStdout) console.log("Info Result:", stdout);
+      if (config.showConsoleOutput) printVerbose(`Info Result: ${stdout}`);
       const nodesMatch = stdout.match(
         /Nodes in mesh:\s*({[\s\S]*?})\s*(?:Preferences:|Channels:|$)/
       );
       if (nodesMatch && nodesMatch[1]) {
-        let nodesBlock = nodesMatch[1].trim();
         try {
-          const origNodes = JSON.parse(nodesBlock);
-          meshData.knownNodes = Object.keys(origNodes).map((nodeId) => {
-            const nodeData = origNodes[nodeId];
-            const knownNode = meshData.knownNodes.find((n) => n.id === nodeId);
-            const lastHeard = nodeData.lastHeard || null;
-            if (knownNode && knownNode.lastHeard !== lastHeard) {
-              knownNode.lastHeard = lastHeard;
-              knownNode.lastTracerouteAttempt = null;
-            }
-            return {
-              id: nodeId,
-              longName: nodeData.user.longName || null,
-              shortName: nodeData.user.shortName || null,
-              model: nodeData.user.hwModel || null,
-              lastHeard: lastHeard,
-              batteryLevel: nodeData.deviceMetrics?.batteryLevel || null,
-              voltage: nodeData.deviceMetrics?.voltage || null,
-              snr: nodeData.snr || null,
-              hops: nodeData.hopsAway || 0,
-              uptimeSeconds: nodeData.deviceMetrics?.uptimeSeconds || null,
-              lat: nodeData.position?.latitude || null,
-              lon: nodeData.position?.longitude || null,
-              publicKey: nodeData.user.publicKey || null,
-              lastTracerouteSuccess: knownNode?.lastTracerouteSuccess || null,
-              lastTracerouteAttempt: knownNode?.lastTracerouteAttempt || null,
-            };
-          });
-          meshData.info.lastUpdated = Date.now();
-          meshData.info.infoFrom = meshData.knownNodes[0].id;
+          processNodeData(JSON.parse(nodesMatch[1].trim()));
           saveData();
-          currentNodeIndex = 1;
-          runTraceroute();
+          if (retryAfterFailure) {
+            currentNodeIndex = 1;
+            runTraceroute();
+          }
         } catch (parseError) {
-          setTimeout(runInfo, retryDelay);
+          printError(`JSON Parsing Error: ${parseError.message}`);
+          if (retryAfterFailure)
+            setTimeout(
+              () => runInfo(retryAfterFailure),
+              config.delays.retryDelay * 1000
+            );
         }
       }
     }
   );
 };
 
+const processNodeData = (origNodes) => {
+  meshData.knownNodes = Object.keys(origNodes).map((nodeId) => {
+    const nodeData = origNodes[nodeId];
+    const knownNode = meshData.knownNodes.find((n) => n.id === nodeId);
+    const lastHeard = nodeData.lastHeard || null;
+
+    if (knownNode && knownNode.lastHeard !== lastHeard) {
+      knownNode.lastHeard = lastHeard;
+      knownNode.lastTracerouteAttempt = null;
+    }
+
+    return {
+      id: nodeId,
+      longName: nodeData.user.longName || null,
+      shortName: nodeData.user.shortName || null,
+      model: nodeData.user.hwModel || null,
+      lastHeard: lastHeard,
+      batteryLevel: nodeData.deviceMetrics?.batteryLevel || null,
+      voltage: nodeData.deviceMetrics?.voltage || null,
+      snr: nodeData.snr || null,
+      hops: nodeData.hopsAway || 0,
+      uptimeSeconds: nodeData.deviceMetrics?.uptimeSeconds || null,
+      lat: nodeData.position?.latitude || null,
+      lon: nodeData.position?.longitude || null,
+      publicKey: nodeData.user.publicKey || null,
+      lastTracerouteSuccess: knownNode?.lastTracerouteSuccess || null,
+      lastTracerouteAttempt: knownNode?.lastTracerouteAttempt || null,
+    };
+  });
+
+  meshData.info.lastUpdated = Date.now();
+  meshData.info.infoFrom = meshData.knownNodes[0]?.id || null;
+};
+
 const runTraceroute = () => {
   if (currentNodeIndex >= meshData.knownNodes.length) {
-    setTimeout(runInfo, delay);
+    setTimeout(runInfo, config.delays.delay * 1000);
     return;
   }
+
   const node = meshData.knownNodes[currentNodeIndex];
   const currentTime = Date.now();
+
   if (
     (node.lastTracerouteSuccess &&
-      currentTime - node.lastTracerouteSuccess < 1800000) || // 0.5h
+      currentTime - node.lastTracerouteSuccess <
+        config.delays.tracerouteActiveNodes * 1000) ||
     (node.lastTracerouteAttempt &&
-      currentTime - node.lastTracerouteAttempt < 3600000) // 1h
+      currentTime - node.lastTracerouteAttempt <
+        config.delays.tracerouteInactiveNodes * 1000)
   ) {
     currentNodeIndex++;
-    setTimeout(runTraceroute, delay);
+    setTimeout(runTraceroute, config.delays.delay * 1000);
     return;
   }
-  console.log(`Traceroute to Node ${node.id}`);
+
+  printVerbose(`Traceroute to Node ${node.id}`);
   exec(
-    (isRaspberryPi ? piMeshLoc : "meshtastic ") +
-      (useNetworkNode ? networkNode : "") +
-      "--traceroute '" +
-      node.id +
-      "'",
+    (config.isRaspberryPi
+      ? config.absoluteMeshtasticPathRaspberry + " "
+      : "meshtastic ") +
+      (config.useNetworkNode ? `--host ${config.networkNodeIp} ` : "") +
+      `--traceroute '${node.id}'`,
     (error, stdout) => {
       node.lastTracerouteAttempt = currentTime;
       if (error || stdout.includes("Timed out")) {
+        printError(`Traceroute Error: ${error?.message || "Timed out"}`);
         currentNodeIndex++;
-        setTimeout(runTraceroute, retryDelay);
+        setTimeout(runTraceroute, config.delays.retryDelay * 1000);
         return;
       }
-      if (showStdout) console.log("Traceroute Result:", stdout);
+      if (config.showConsoleOutput)
+        printVerbose(`Traceroute Result: ${stdout}`);
+
       const parsedTrace = parseTraceroute(stdout, node.id);
       if (parsedTrace) {
         addTraceToNode(parsedTrace);
@@ -145,7 +197,7 @@ const runTraceroute = () => {
         saveData();
       }
       currentNodeIndex++;
-      setTimeout(runTraceroute, delay);
+      setTimeout(runTraceroute, config.delays.delay * 1000);
     }
   );
 };
@@ -170,9 +222,11 @@ const parseTraceroute = (traceText, nodeId) => {
     nodeTraceFrom: [],
     hops: -1,
   };
+
   const lines = traceText.split("\n");
   let toLine = null;
   let fromLine = null;
+
   lines.forEach((line) => {
     if (line.includes("Route traced towards destination:")) {
       toLine = true;
@@ -188,29 +242,34 @@ const parseTraceroute = (traceText, nodeId) => {
       fromLine = false;
     }
   });
+
   if (trace.nodeTraceTo.length > 0 && trace.nodeTraceFrom.length > 0) {
     const toHops = trace.nodeTraceTo.length - 2;
     const fromHops = trace.nodeTraceFrom.length - 2;
     trace.hops = Math.min(toHops, fromHops);
     return trace;
   }
-  console.error("Traceroute not complete - ignoring.");
+
+  printError("Traceroute not complete - ignoring.");
   return null;
 };
 
 const serverSync = async () => {
+  if (!config.uploadToServer) return;
+
   try {
     const jsonData = fs.readFileSync(logFile, "utf8");
     const parsedData = JSON.parse(jsonData);
-    parsedData.apiKey = apiKey;
-    await axios.post(apiUrl, parsedData, {
+    parsedData.apiKey = config.apiKey;
+
+    await axios.post(config.apiUrl, parsedData, {
       headers: {
         "Content-Type": "application/json",
       },
     });
-    console.log("Updated data on server");
+    printVerbose("Updated data on server");
   } catch (error) {
-    console.error(`API Error: ${error.message}`);
+    printError(`API Error: ${error.message}`);
   }
 };
 
