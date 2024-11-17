@@ -4,16 +4,13 @@ const fs = require("fs");
 const path = require("path");
 const { exec } = require("child_process");
 const axios = require("axios");
-
 const config = require("./config.json");
-
 let meshData = {
   info: { lastUpdated: null, infoFrom: null },
   knownNodes: [],
   traceroutes: [],
 };
 let currentNodeIndex = 1;
-
 const logFile = path.join(__dirname, "meshdata.json");
 
 const printVerbose = (message) => {
@@ -55,6 +52,7 @@ const structureHandling = () => {
 
 const saveData = () => {
   cleanOldTraceroutes();
+  cleanOldPowerHistory();
   fs.writeFileSync(logFile, JSON.stringify(meshData, null, 2));
   if (config.uploadToServer) {
     serverSync();
@@ -67,6 +65,20 @@ const cleanOldTraceroutes = () => {
   meshData.traceroutes = meshData.traceroutes.filter((route) => {
     route.traces = route.traces.filter((trace) => trace.timeStamp > cutoffTime);
     return route.traces.length > 0;
+  });
+};
+
+const cleanOldPowerHistory = () => {
+  const cutoffTime = Date.now() - config.delays.cleanOldTraceroutes * 1000;
+  meshData.knownNodes.forEach((node) => {
+    if (node.power) {
+      node.power.batteryLevel = node.power.batteryLevel.filter(
+        (entry) => entry.timestamp > cutoffTime
+      );
+      node.power.voltage = node.power.voltage.filter(
+        (entry) => entry.timestamp > cutoffTime
+      );
+    }
   });
 };
 
@@ -120,20 +132,39 @@ const processNodeData = (origNodes) => {
     const nodeData = origNodes[nodeId];
     const knownNode = meshData.knownNodes.find((n) => n.id === nodeId);
     const lastHeard = nodeData.lastHeard || null;
-
     if (knownNode && knownNode.lastHeard !== lastHeard) {
       knownNode.lastHeard = lastHeard;
       knownNode.lastTracerouteAttempt = null;
     }
-
+    const batteryLevel = nodeData.deviceMetrics?.batteryLevel ?? null;
+    const voltage = nodeData.deviceMetrics?.voltage ?? null;
+    const powerHistory = knownNode?.power || { batteryLevel: [], voltage: [] };
+    if (
+      batteryLevel !== null &&
+      batteryLevel !== undefined &&
+      batteryLevel !== knownNode?.batteryLevel
+    ) {
+      powerHistory.batteryLevel.push({
+        state: batteryLevel,
+        timestamp: Date.now(),
+      });
+    }
+    if (
+      voltage !== null &&
+      voltage !== undefined &&
+      voltage !== knownNode?.voltage
+    ) {
+      powerHistory.voltage.push({ state: voltage, timestamp: Date.now() });
+    }
     return {
       id: nodeId,
       longName: nodeData.user.longName || null,
       shortName: nodeData.user.shortName || null,
       model: nodeData.user.hwModel || null,
       lastHeard: lastHeard,
-      batteryLevel: nodeData.deviceMetrics?.batteryLevel || null,
-      voltage: nodeData.deviceMetrics?.voltage || null,
+      batteryLevel: batteryLevel,
+      voltage: voltage,
+      power: powerHistory,
       snr: nodeData.snr || null,
       hops: nodeData.hopsAway || 0,
       uptimeSeconds: nodeData.deviceMetrics?.uptimeSeconds || null,
@@ -144,7 +175,6 @@ const processNodeData = (origNodes) => {
       lastTracerouteAttempt: knownNode?.lastTracerouteAttempt || null,
     };
   });
-
   meshData.info.lastUpdated = Date.now();
   meshData.info.infoFrom = meshData.knownNodes[0]?.id || null;
 };
@@ -154,10 +184,8 @@ const runTraceroute = () => {
     setTimeout(runInfo, config.delays.delay * 1000);
     return;
   }
-
   const node = meshData.knownNodes[currentNodeIndex];
   const currentTime = Date.now();
-
   if (
     (node.lastTracerouteSuccess &&
       currentTime - node.lastTracerouteSuccess <
@@ -170,7 +198,6 @@ const runTraceroute = () => {
     setTimeout(runTraceroute, config.delays.delay * 1000);
     return;
   }
-
   printVerbose(`Traceroute to Node ${node.id}`);
   exec(
     (config.isRaspberryPi
@@ -188,7 +215,6 @@ const runTraceroute = () => {
       }
       if (config.showConsoleOutput)
         printVerbose(`Traceroute Result: ${stdout}`);
-
       const parsedTrace = parseTraceroute(stdout, node.id);
       if (parsedTrace) {
         addTraceToNode(parsedTrace);
@@ -222,11 +248,9 @@ const parseTraceroute = (traceText, nodeId) => {
     nodeTraceFrom: [],
     hops: -1,
   };
-
   const lines = traceText.split("\n");
   let toLine = null;
   let fromLine = null;
-
   lines.forEach((line) => {
     if (line.includes("Route traced towards destination:")) {
       toLine = true;
@@ -242,26 +266,22 @@ const parseTraceroute = (traceText, nodeId) => {
       fromLine = false;
     }
   });
-
   if (trace.nodeTraceTo.length > 0 && trace.nodeTraceFrom.length > 0) {
     const toHops = trace.nodeTraceTo.length - 2;
     const fromHops = trace.nodeTraceFrom.length - 2;
     trace.hops = Math.min(toHops, fromHops);
     return trace;
   }
-
   printError("Traceroute not complete - ignoring.");
   return null;
 };
 
 const serverSync = async () => {
   if (!config.uploadToServer) return;
-
   try {
     const jsonData = fs.readFileSync(logFile, "utf8");
     const parsedData = JSON.parse(jsonData);
     parsedData.apiKey = config.apiKey;
-
     await axios.post(config.apiUrl, parsedData, {
       headers: {
         "Content-Type": "application/json",
