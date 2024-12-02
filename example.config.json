@@ -9,10 +9,10 @@
   "useNetworkNode": false,
   "uploadToServer": true,
   "delays": {
-    "retryDelay": 30,
-    "delay": 5,
-    "tracerouteActiveNodes": 900,
-    "tracerouteInactiveNodes": 2700,
+    "retryDelay": 60,
+    "delay": 10,
+    "tracerouteActiveNodes": 1800,
+    "tracerouteInactiveNodes": 3600,
     "cleanOldTraceroutes": 172800
   }
 }

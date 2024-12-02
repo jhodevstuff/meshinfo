@@ -209,8 +209,11 @@ const runTraceroute = () => {
       node.lastTracerouteAttempt = currentTime;
       if (error || stdout.includes("Timed out")) {
         printError(`Traceroute Error: ${error?.message || "Timed out"}`);
-        currentNodeIndex++;
-        setTimeout(runTraceroute, config.delays.retryDelay * 1000);
+        runInfo(false);
+        setTimeout(() => {
+          currentNodeIndex++;
+          runTraceroute();
+        }, config.delays.retryDelay * 1000);
         return;
       }
       if (config.showConsoleOutput)
