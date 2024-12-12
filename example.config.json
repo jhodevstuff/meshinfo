@@ -8,6 +8,11 @@
   "absoluteMeshtasticPathRaspberry": "/home/jho/.local/bin/meshtastic",
   "useNetworkNode": false,
   "uploadToServer": true,
+  "deleteAfterHours": {
+    "traceroutes": 48,
+    "power": 48,
+    "online": 168
+  },
   "delays": {
     "retryDelay": 60,
     "delay": 10,
