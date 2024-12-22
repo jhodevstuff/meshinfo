@@ -1,18 +1,18 @@
 {
-  "apiUrl": "https://example.com/mt/updatelog.php",
+  "apiUrl": "https://your-server.com/updatelog.php",
   "apiKey": "api-key",
   "networkNodeIp": "192.168.178.114",
   "verbose": true,
-  "showConsoleOutput": true,
+  "showConsoleOutput": false,
   "isRaspberryPi": false,
   "absoluteMeshtasticPathRaspberry": "/home/jho/.local/bin/meshtastic",
   "useNetworkNode": false,
-  "uploadToServer": true,
   "deleteAfterHours": {
-    "traceroutes": 48,
-    "power": 48,
+    "traceroutes": 96,
+    "power": 96,
     "online": 168
   },
+  "uploadToServer": true,
   "delays": {
     "retryDelay": 60,
     "delay": 10,
