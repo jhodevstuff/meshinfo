@@ -197,14 +197,14 @@ const processNodeData = (origNodes) => {
     };
     const fixLivingInTheFuture = (timestamp) => {
       const currentTime = Date.now();
-      const oneDayMs = 24 * 60 * 60 * 1000;
+      const oneDayMs = 365 * 24 * 60 * 60 * 1000;
       if (timestamp > currentTime + oneDayMs) {
         return currentTime;
       }
       return timestamp;
     }
     if (lastHeard) {
-      node.lastHeard = fixLivingInTheFuture(node.lastHeard);
+      // node.lastHeard = fixLivingInTheFuture(node.lastHeard);
       updateNodeOnline(node, lastHeard);
     }
     return node;
