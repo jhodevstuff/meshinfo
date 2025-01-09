@@ -256,8 +256,10 @@ const processNodeData = (origNodes) => {
       return timestamp;
     }
     if (lastHeard) {
-      node.lastHeard = fixLivingInTheFuture(node.lastHeard);
-      updateNodeOnline(node, lastHeard);
+      const fixed = fixLivingInTheFuture(lastHeard);
+      if (!knownNode?.lastHeard || fixed > knownNode.lastHeard) {
+        updateNodeOnline(node, fixed);
+      }
     }
     return node;
   });
