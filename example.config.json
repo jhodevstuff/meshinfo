@@ -5,7 +5,7 @@
   "verbose": true,
   "showConsoleOutput": false,
   "isRaspberryPi": false,
-  "absoluteMeshtasticPathRaspberry": "/home/jho/.local/bin/meshtastic",
+  "absoluteMeshtasticPathRaspberry": "/home/pi/.local/bin/meshtastic",
   "useNetworkNode": false,
   "deleteAfterHours": {
     "traceroutes": 96,
@@ -19,5 +19,6 @@
     "tracerouteActiveNodes": 1800,
     "tracerouteInactiveNodes": 3600,
     "cleanOldTraceroutes": 172800
-  }
+  },
+  "deleteOldNodesFromNodeDB": true
 }
