@@ -1,4 +1,4 @@
-// 2024-12-12 by Joshua Hoffmann
+// 2025-01-09 by Joshua Hoffmann
 
 const fs = require("fs");
 const path = require("path");
@@ -28,7 +28,6 @@ const printVerbose = (message, error) => {
     }
   }
 };
-
 
 const structureHandling = () => {
   if (fs.existsSync(logFile)) {
@@ -196,7 +195,16 @@ const processNodeData = (origNodes) => {
       lastTracerouteAttempt: knownNode?.lastTracerouteAttempt || null,
       online: knownNode?.online || [],
     };
+    const fixLivingInTheFuture = (timestamp) => {
+      const currentTime = Date.now();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      if (timestamp > currentTime + oneDayMs) {
+        return currentTime;
+      }
+      return timestamp;
+    }
     if (lastHeard) {
+      node.lastHeard = fixLivingInTheFuture(node.lastHeard);
       updateNodeOnline(node, lastHeard);
     }
     return node;
