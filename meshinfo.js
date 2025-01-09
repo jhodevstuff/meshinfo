@@ -195,14 +195,14 @@ const processNodeData = (origNodes) => {
       lastTracerouteAttempt: knownNode?.lastTracerouteAttempt || null,
       online: knownNode?.online || [],
     };
-    const fixLivingInTheFuture = (timestamp) => {
-      const currentTime = Date.now();
-      const oneDayMs = 365 * 24 * 60 * 60 * 1000;
-      if (timestamp > currentTime + oneDayMs) {
-        return currentTime;
-      }
-      return timestamp;
-    }
+    // const fixLivingInTheFuture = (timestamp) => {
+    //   const currentTime = Date.now();
+    //   const oneDayMs = 365 * 24 * 60 * 60 * 1000;
+    //   if (timestamp > currentTime + oneDayMs) {
+    //     return currentTime;
+    //   }
+    //   return timestamp;
+    // }
     if (lastHeard) {
       // node.lastHeard = fixLivingInTheFuture(node.lastHeard);
       updateNodeOnline(node, lastHeard);
