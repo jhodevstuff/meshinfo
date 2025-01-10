@@ -1,4 +1,4 @@
-// 2025-01-09 by Joshua Hoffmann
+// 2024-12-12 by Joshua Hoffmann
 
 const fs = require("fs");
 const path = require("path");
@@ -28,6 +28,7 @@ const printVerbose = (message, error) => {
     }
   }
 };
+
 
 const structureHandling = () => {
   if (fs.existsSync(logFile)) {
@@ -86,58 +87,6 @@ const cleanOldData = () => {
       node.lastHeard = normalizeTimestamp(node.lastHeard);
     }
   });
-}
-
-const removeNodeFromDB = async (nodeId, nodeName) => {
-  printVerbose(`Removing node ${nodeId} aka ${nodeName}`);
-  const command =
-    (config.isRaspberryPi
-      ? config.absoluteMeshtasticPathRaspberry + " "
-      : "meshtastic ") +
-    (config.useNetworkNode ? `--host ${config.networkNodeIp} ` : "") +
-    `--remove-node '${nodeId}'`;
-  try {
-    const { stdout, stderr } = await new Promise((resolve, reject) => {
-      exec(command, (error, stdout, stderr) => {
-        if (error) {
-          return reject(error);
-        }
-        resolve({ stdout, stderr });
-      });
-    });
-    if (stderr) {
-      printVerbose(`Error removing node ${nodeId} from DB: ${stderr}`, true);
-    } else {
-      printVerbose(`Removed node ${nodeId} from DB`);
-    }
-  } catch (error) {
-    printVerbose(`Error removing node ${nodeId} from DB: ${error.message}`, true);
-  }
-}
-
-const cleanNodeDB = async () => {
-  if (!config.deleteOldNodesFromNodeDB) return;
-  if (meshData.knownNodes.length < 80) return;
-  const now = Date.now();
-  const twoWeeks = 14 * 24 * 60 * 60 * 1000;
-  const oneWeek = 7 * 24 * 60 * 60 * 1000;
-  const olderThan2Weeks = meshData.knownNodes.filter(
-    (node) => node.lastHeard && now - node.lastHeard > twoWeeks
-  );
-  if (olderThan2Weeks.length > 0) {
-    for (const node of olderThan2Weeks) {
-      await removeNodeFromDB(node.id, node.longName);
-    }
-    return;
-  }
-  const olderThan1Week = meshData.knownNodes.filter(
-    (node) => node.lastHeard && now - node.lastHeard > oneWeek
-  );
-  if (olderThan1Week.length > 0) {
-    for (const node of olderThan1Week) {
-      await removeNodeFromDB(node.id, node.longName);
-    }
-  }
 }
 
 const updateNodeOnline = (node, newTimestamp) => {
@@ -247,19 +196,8 @@ const processNodeData = (origNodes) => {
       lastTracerouteAttempt: knownNode?.lastTracerouteAttempt || null,
       online: knownNode?.online || [],
     };
-    const fixLivingInTheFuture = (timestamp) => {
-      const currentTime = Date.now();
-      const oneYear = 365 * 24 * 60 * 60 * 1000;
-      if (timestamp > currentTime + oneYear) {
-        return currentTime;
-      }
-      return timestamp;
-    }
     if (lastHeard) {
-      const fixed = fixLivingInTheFuture(lastHeard);
-      if (!knownNode?.lastHeard || fixed > knownNode.lastHeard) {
-        updateNodeOnline(node, fixed);
-      }
+      updateNodeOnline(node, lastHeard);
     }
     return node;
   });
@@ -267,13 +205,10 @@ const processNodeData = (origNodes) => {
   meshData.info.infoFrom = meshData.knownNodes[0]?.id || null;
 };
 
-const runTraceroute = async () => {
+const runTraceroute = () => {
   if (currentNodeIndex >= meshData.knownNodes.length) {
     setTimeout(runInfo, config.delays.delay * 1000);
     return;
-  }
-  if (currentNodeIndex === 1) {
-    await cleanNodeDB();
   }
   const node = meshData.knownNodes[currentNodeIndex];
   const currentTime = Date.now();
