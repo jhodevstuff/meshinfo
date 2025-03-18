@@ -151,7 +151,7 @@ const removeNodeFromDB = async (nodeId, nodeName) => {
   try {
     const { stderr } = await execAsync(cmd);
     if (stderr) printVerbose(`Error removing node ${nodeId}: ${stderr}`, true);
-    else printVerbose(`Node ${nodeId} entfernt.`);
+    else printVerbose(`Node ${nodeId} removed.`);
   } catch (err) {
     printVerbose(`Error removing node ${nodeId}: ${err.message}`, true);
   }
