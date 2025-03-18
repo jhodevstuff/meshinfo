@@ -159,7 +159,7 @@ const removeNodeFromDB = async (nodeId, nodeName) => {
 
 const cleanNodeDB = async meshData => {
   if (!config.deleteOldNodesFromNodeDB) return;
-  if (meshData.knownNodes.length < 80) return;
+  if (meshData.knownNodes.length < 90) return;
   const now = Date.now();
   const twoWeeks = 14 * 24 * 60 * 60 * 1000;
   const oneWeek = 7 * 24 * 60 * 60 * 1000;
