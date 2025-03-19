@@ -93,6 +93,8 @@ const processNodeData = (origNodes, meshData) => {
     const lastHeard = nodeData.lastHeard || null;
     const batteryLevel = (nodeData.deviceMetrics && nodeData.deviceMetrics.batteryLevel != null)
       ? nodeData.deviceMetrics.batteryLevel : null;
+    const uptime = (nodeData.deviceMetrics && nodeData.deviceMetrics.uptimeSeconds != null)
+      ? nodeData.deviceMetrics.uptimeSeconds : null;
     const voltage = (nodeData.deviceMetrics && nodeData.deviceMetrics.voltage != null)
       ? nodeData.deviceMetrics.voltage : null;
     const powerHistory = knownNode.power || { batteryLevel: [], voltage: [] };
@@ -107,8 +109,10 @@ const processNodeData = (origNodes, meshData) => {
       longName: (nodeData.user && nodeData.user.longName) || null,
       shortName: (nodeData.user && nodeData.user.shortName) || null,
       model: (nodeData.user && nodeData.user.hwModel) || null,
+      role: (nodeData.user && nodeData.user.role) || null,
       lastHeard: knownNode.lastHeard || null,
       batteryLevel: batteryLevel,
+      uptime: uptime,
       voltage: voltage,
       power: powerHistory,
       snr: nodeData.snr || null,
