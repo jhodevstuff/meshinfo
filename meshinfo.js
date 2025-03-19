@@ -87,9 +87,10 @@ const updateNodeOnline = (node, timestamp) => {
 };
 
 const processNodeData = (origNodes, meshData) => {
+  const oldNodes = meshData.knownNodes || [];
   meshData.knownNodes = Object.keys(origNodes).map(nodeId => {
     const nodeData = origNodes[nodeId];
-    const knownNode = meshData.knownNodes.find(n => n.id === nodeId) || {};
+    const knownNode = oldNodes.find(n => n.id === nodeId) || {};
     const lastHeard = nodeData.lastHeard || null;
     const batteryLevel = (nodeData.deviceMetrics && nodeData.deviceMetrics.batteryLevel != null)
       ? nodeData.deviceMetrics.batteryLevel : null;
@@ -129,7 +130,6 @@ const processNodeData = (origNodes, meshData) => {
     return node;
   });
   if (meshData.knownNodes.length > 0) {
-    // Masternode = erstes Element; lastHeard immer auf aktuellen Timestamp setzen
     meshData.info.infoFrom = meshData.knownNodes[0].id;
     updateNodeOnline(meshData.knownNodes[0], Date.now());
   }
