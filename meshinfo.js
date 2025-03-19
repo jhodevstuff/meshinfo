@@ -10,7 +10,7 @@ const util = require('util');
 const execAsync = util.promisify(exec);
 
 const config = require('./config.json');
-const logFile = path.join(__dirname, 'meshdata_beta.json');
+const logFile = path.join(__dirname, 'meshdata.json');
 
 const printHello = () => {
   console.log('Welcome to');
