@@ -92,36 +92,30 @@ const processNodeData = (origNodes, meshData) => {
     const nodeData = origNodes[nodeId];
     const knownNode = oldNodes.find(n => n.id === nodeId) || {};
     const lastHeard = nodeData.lastHeard || null;
-    const batteryLevel = (nodeData.deviceMetrics && nodeData.deviceMetrics.batteryLevel != null)
-      ? nodeData.deviceMetrics.batteryLevel : null;
-    const uptime = (nodeData.deviceMetrics && nodeData.deviceMetrics.uptimeSeconds != null)
-      ? nodeData.deviceMetrics.uptimeSeconds : null;
-    const voltage = (nodeData.deviceMetrics && nodeData.deviceMetrics.voltage != null)
-      ? nodeData.deviceMetrics.voltage : null;
+    const batteryLevel = nodeData.deviceMetrics?.batteryLevel ?? null;
+    const voltage = nodeData.deviceMetrics?.voltage ?? null;
     const powerHistory = knownNode.power || { batteryLevel: [], voltage: [] };
-    if (batteryLevel != null && batteryLevel !== knownNode.batteryLevel) {
+    if (batteryLevel !== null && batteryLevel !== undefined && batteryLevel !== knownNode?.batteryLevel) {
       powerHistory.batteryLevel.push({ state: batteryLevel, timestamp: Date.now() });
     }
-    if (voltage != null && voltage !== knownNode.voltage) {
+    if (voltage !== null && voltage !== undefined && voltage !== knownNode?.voltage) {
       powerHistory.voltage.push({ state: voltage, timestamp: Date.now() });
     }
-    let node = {
+    const node = {
       id: nodeId,
-      longName: (nodeData.user && nodeData.user.longName) || null,
-      shortName: (nodeData.user && nodeData.user.shortName) || null,
-      model: (nodeData.user && nodeData.user.hwModel) || null,
-      role: (nodeData.user && nodeData.user.role) || null,
+      longName: nodeData.user?.longName || null,
+      shortName: nodeData.user?.shortName || null,
+      model: nodeData.user?.hwModel || null,
       lastHeard: knownNode.lastHeard || null,
       batteryLevel: batteryLevel,
-      uptime: uptime,
       voltage: voltage,
       power: powerHistory,
       snr: nodeData.snr || null,
       hops: nodeData.hopsAway || 0,
-      uptimeSeconds: (nodeData.deviceMetrics && nodeData.deviceMetrics.uptimeSeconds) || null,
-      lat: (nodeData.position && nodeData.position.latitude) || null,
-      lon: (nodeData.position && nodeData.position.longitude) || null,
-      publicKey: (nodeData.user && nodeData.user.publicKey) || null,
+      uptimeSeconds: nodeData.deviceMetrics?.uptimeSeconds || null,
+      lat: nodeData.position?.latitude || null,
+      lon: nodeData.position?.longitude || null,
+      publicKey: nodeData.user?.publicKey || null,
       lastTracerouteSuccess: knownNode.lastTracerouteSuccess || null,
       lastTracerouteAttempt: knownNode.lastTracerouteAttempt || null,
       online: knownNode.online || []
@@ -129,11 +123,8 @@ const processNodeData = (origNodes, meshData) => {
     if (lastHeard) updateNodeOnline(node, lastHeard);
     return node;
   });
-  if (meshData.knownNodes.length > 0) {
-    meshData.info.infoFrom = meshData.knownNodes[0].id;
-    updateNodeOnline(meshData.knownNodes[0], Date.now());
-  }
   meshData.info.lastUpdated = Date.now();
+  meshData.info.infoFrom = meshData.knownNodes[0]?.id || null;
 };
 
 const saveData = meshData => {
