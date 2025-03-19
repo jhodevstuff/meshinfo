@@ -1,6 +1,6 @@
 // meshinfo.js
 // by Joshua Hoffmann
-const buildDate = '2025-02-24';
+const buildDate = '2025-03-19';
 
 const fs = require('fs');
 const path = require('path');
@@ -86,27 +86,37 @@ const updateNodeOnline = (node, timestamp) => {
   if (!node.online.includes(t)) node.online.push(t);
 };
 
-const processNodeData = (origNodes, meshData) => {
-  const oldNodes = meshData.knownNodes || [];
-  meshData.knownNodes = Object.keys(origNodes).map(nodeId => {
+const processNodeData = (origNodes) => {
+  meshData.knownNodes = Object.keys(origNodes).map((nodeId) => {
     const nodeData = origNodes[nodeId];
-    const knownNode = oldNodes.find(n => n.id === nodeId) || {};
+    const knownNode = meshData.knownNodes.find((n) => n.id === nodeId);
     const lastHeard = nodeData.lastHeard || null;
     const batteryLevel = nodeData.deviceMetrics?.batteryLevel ?? null;
     const voltage = nodeData.deviceMetrics?.voltage ?? null;
-    const powerHistory = knownNode.power || { batteryLevel: [], voltage: [] };
-    if (batteryLevel !== null && batteryLevel !== undefined && batteryLevel !== knownNode?.batteryLevel) {
-      powerHistory.batteryLevel.push({ state: batteryLevel, timestamp: Date.now() });
+    const powerHistory = knownNode?.power || { batteryLevel: [], voltage: [] };
+    if (
+      batteryLevel !== null &&
+      batteryLevel !== undefined &&
+      batteryLevel !== knownNode?.batteryLevel
+    ) {
+      powerHistory.batteryLevel.push({
+        state: batteryLevel,
+        timestamp: Date.now(),
+      });
     }
-    if (voltage !== null && voltage !== undefined && voltage !== knownNode?.voltage) {
+    if (
+      voltage !== null &&
+      voltage !== undefined &&
+      voltage !== knownNode?.voltage
+    ) {
       powerHistory.voltage.push({ state: voltage, timestamp: Date.now() });
     }
     const node = {
       id: nodeId,
-      longName: nodeData.user?.longName || null,
-      shortName: nodeData.user?.shortName || null,
-      model: nodeData.user?.hwModel || null,
-      lastHeard: knownNode.lastHeard || null,
+      longName: nodeData.user.longName || null,
+      shortName: nodeData.user.shortName || null,
+      model: nodeData.user.hwModel || null,
+      lastHeard: knownNode?.lastHeard || null,
       batteryLevel: batteryLevel,
       voltage: voltage,
       power: powerHistory,
@@ -115,12 +125,14 @@ const processNodeData = (origNodes, meshData) => {
       uptimeSeconds: nodeData.deviceMetrics?.uptimeSeconds || null,
       lat: nodeData.position?.latitude || null,
       lon: nodeData.position?.longitude || null,
-      publicKey: nodeData.user?.publicKey || null,
-      lastTracerouteSuccess: knownNode.lastTracerouteSuccess || null,
-      lastTracerouteAttempt: knownNode.lastTracerouteAttempt || null,
-      online: knownNode.online || []
+      publicKey: nodeData.user.publicKey || null,
+      lastTracerouteSuccess: knownNode?.lastTracerouteSuccess || null,
+      lastTracerouteAttempt: knownNode?.lastTracerouteAttempt || null,
+      online: knownNode?.online || [],
     };
-    if (lastHeard) updateNodeOnline(node, lastHeard);
+    if (lastHeard) {
+      updateNodeOnline(node, lastHeard);
+    }
     return node;
   });
   meshData.info.lastUpdated = Date.now();
@@ -174,33 +186,49 @@ const cleanNodeDB = async meshData => {
 };
 
 const parseTraceroute = (traceText, nodeId) => {
-  let trace = { nodeId, timeStamp: Date.now(), nodeTraceTo: [], nodeTraceFrom: [], hops: -1 };
-  let toLine = false, fromLine = false;
-  traceText.split('\n').forEach(line => {
+  const trace = {
+    nodeId,
+    timeStamp: Date.now(),
+    nodeTraceTo: [],
+    nodeTraceFrom: [],
+    hops: -1,
+  };
+  const lines = traceText.split('\n');
+  let toLine = null;
+  let fromLine = null;
+  lines.forEach((line) => {
     if (line.includes('Route traced towards destination:')) toLine = true;
     else if (line.includes('Route traced back to us:')) fromLine = true;
     else if (toLine && line.includes(' --> ')) {
-      trace.nodeTraceTo = line.split(' --> ').map(item => item.split(' ')[0]);
+      trace.nodeTraceTo = line.split(' --> ').map((item) => item.split(' ')[0]);
       toLine = false;
     } else if (fromLine && line.includes(' --> ')) {
-      trace.nodeTraceFrom = line.split(' --> ').map(item => item.split(' ')[0]);
+      trace.nodeTraceFrom = line
+        .split(' --> ')
+        .map((item) => item.split(' ')[0]);
       fromLine = false;
     }
   });
   if (trace.nodeTraceTo.length > 0 && trace.nodeTraceFrom.length > 0) {
-    let toHops = trace.nodeTraceTo.length - 2;
-    let fromHops = trace.nodeTraceFrom.length - 2;
+    const toHops = trace.nodeTraceTo.length - 2;
+    const fromHops = trace.nodeTraceFrom.length - 2;
     trace.hops = Math.min(toHops, fromHops);
     return trace;
   }
-  printVerbose('Error tracing route. Ignorning.', true);
+  printVerbose('Traceroute not complete - ignoring.', true);
   return null;
 };
 
 const addTraceToNode = (meshData, parsedTrace) => {
-  let route = meshData.traceroutes.find(r => r.nodeId === parsedTrace.nodeId);
-  if (route) route.traces.push(parsedTrace);
-  else meshData.traceroutes.push({ nodeId: parsedTrace.nodeId, traces: [parsedTrace] });
+  let nodeTraceroute = meshData.traceroutes.find(
+    (route) => route.nodeId === parsedTrace.nodeId
+  );
+  if (nodeTraceroute) {
+    nodeTraceroute.traces.push(parsedTrace);
+  } else {
+    nodeTraceroute = { nodeId: parsedTrace.nodeId, traces: [parsedTrace] };
+    meshData.traceroutes.push(nodeTraceroute);
+  }
 };
 
 const serverSync = async meshData => {
@@ -226,7 +254,7 @@ const runInfo = async () => {
     const match = stdout.match(/Nodes in mesh:\s*({[\s\S]*?})\s*(?:Preferences:|Channels:|$)/);
     if (match && match[1]) {
       const origNodes = JSON.parse(match[1].trim());
-      processNodeData(origNodes, meshData);
+      processNodeData(origNodes);
       saveData(meshData);
       return true;
     }
